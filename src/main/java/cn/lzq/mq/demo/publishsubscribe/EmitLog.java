@@ -1,4 +1,4 @@
-package cn.lzq.mq.demo;
+package cn.lzq.mq.demo.publishsubscribe;
 
 import com.rabbitmq.client.BuiltinExchangeType;
 import com.rabbitmq.client.Channel;
