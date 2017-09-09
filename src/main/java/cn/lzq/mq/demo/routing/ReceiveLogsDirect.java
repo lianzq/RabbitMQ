@@ -1,4 +1,4 @@
-package cn.lzq.mq.demo;
+package cn.lzq.mq.demo.routing;
 
 import com.rabbitmq.client.*;
 
