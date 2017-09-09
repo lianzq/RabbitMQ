@@ -1,4 +1,4 @@
-package cn.lzq.mq.demo;
+package cn.lzq.mq.demo.workqueues;
 
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
