@@ -74,13 +74,17 @@ public class MessageConsumerImpl implements MessageConsumer {
         return new ChannelAwareMessageListener() {
             @Override
             public void onMessage(Message message, Channel channel) throws Exception {
-                MessageConverter messageConverter = new Jackson2JsonMessageConverter();
-                Object messageBean = messageConverter.fromMessage(message);
-                boolean isSuccess = messageProcess.process(messageBean.toString());
-                if (isSuccess) {
-                    channel.basicAck(message.getMessageProperties().getDeliveryTag(), true);
-                } else {
-                    channel.basicNack(message.getMessageProperties().getDeliveryTag(), false, true);
+                try {
+                    MessageConverter messageConverter = new Jackson2JsonMessageConverter();
+                    Object messageBean = messageConverter.fromMessage(message);
+                    boolean isSuccess = messageProcess.process(messageBean.toString());
+                    if (isSuccess) {
+                        channel.basicAck(message.getMessageProperties().getDeliveryTag(), true);
+                    } else {
+                        channel.basicNack(message.getMessageProperties().getDeliveryTag(), false, false);
+                    }
+                } catch (Exception e) {
+                    channel.basicNack(message.getMessageProperties().getDeliveryTag(), false, false);
                 }
             }
         };
