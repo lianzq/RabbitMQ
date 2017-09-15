@@ -10,21 +10,23 @@ public interface TMessageDao {
 
     long nextValue();
 
-    boolean insert(long id, String message, Long time);
+    boolean insert(long id, String message, Long createdOn);
 
-    boolean insert(long id, String messageId, String message, Long time);
+    boolean insert(long id, String messageId, String message, Long createdOn);
 
-    long insert(String message, Long time);
+    long insert(String message, Long createdOn);
 
-    long insert(String messageId, String message, Long time);
+    long insert(String messageId, String message, Long createdOn);
 
     boolean delete(long id);
 
     boolean deleteByStatus(long id);
 
-    long insert(String message, Long time, String exchangeName, String routing, String queueName, String type);
+    long insert(String message, Long createdOn, String exchangeName, String routing, String queueName, String type);
 
-    long insert(String message, Long time, String exchangeName, String routing, String queueName, String type, String appType);
+    long insert(String messageId, String message, Long createdOn, String exchangeName, String routing, String queueName, String type);
+
+    long insert(String message, Long createdOn, String exchangeName, String routing, String queueName, String type, String appType);
 
     List<Map<String, Object>> queryAllMessage();
 
