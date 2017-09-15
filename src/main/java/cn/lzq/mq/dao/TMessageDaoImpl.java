@@ -26,30 +26,30 @@ public class TMessageDaoImpl implements TMessageDao {
     }
 
     @Override
-    public long insert(String message, Long time) {
+    public long insert(String message, Long createdOn) {
         long id = nextValue();
-        boolean insert = insert(id, message, time);
+        boolean insert = insert(id, message, createdOn);
         return id;
     }
 
     @Override
-    public long insert(String messageId, String message, Long time) {
+    public long insert(String messageId, String message, Long createdOn) {
         long id = nextValue();
-        boolean insert = insert(id, messageId, message, time);
+        boolean insert = insert(id, messageId, message, createdOn);
         return id;
     }
 
     @Override
-    public boolean insert(long id, String message, Long time) {
-        String sql = "insert into mq_message(id,message,time) values(?,?,?)";
-        int rows = jdbcTemplate.update(sql, id, message, time);
+    public boolean insert(long id, String message, Long createdOn) {
+        String sql = "insert into mq_message(id,message,CREATED_ON) values(?,?,?)";
+        int rows = jdbcTemplate.update(sql, id, message, createdOn);
         return rows == 1;
     }
 
     @Override
-    public boolean insert(long id, String messageId, String message, Long time) {
-        String sql = "insert into mq_message(id, message_id, message,time) values(?,?,?,?)";
-        int rows = jdbcTemplate.update(sql, id, messageId, message, time);
+    public boolean insert(long id, String messageId, String message, Long createdOn) {
+        String sql = "insert into mq_message(id, message_id, message,CREATED_ON) values(?,?,?,?)";
+        int rows = jdbcTemplate.update(sql, id, messageId, message, createdOn);
         return rows == 1;
     }
 
@@ -68,19 +68,27 @@ public class TMessageDaoImpl implements TMessageDao {
     }
 
     @Override
-    public long insert(String message, Long time, String exchangeName, String routing, String queueName, String type) {
+    public long insert(String message, Long createdOn, String exchangeName, String routing, String queueName, String type) {
         long id = nextValue();
-        String sql = "insert into mq_message(id, message,time, EXCHANGE_NAME, ROUTING_KEY, QUEUE_NAME, EXCHANGE_TYPE) values(?,?,?,?,?,?,?)";
-        int rows = jdbcTemplate.update(sql, id, message, time, exchangeName, routing, queueName, type);
-        return rows;
+        String sql = "insert into mq_message(id, message,CREATED_ON, EXCHANGE_NAME, ROUTING_KEY, QUEUE_NAME, EXCHANGE_TYPE) values(?,?,?,?,?,?,?)";
+        int rows = jdbcTemplate.update(sql, id, message, createdOn, exchangeName, routing, queueName, type);
+        return id;
     }
 
     @Override
-    public long insert(String message, Long time, String exchangeName, String routing, String queueName, String type, String appType) {
+    public long insert(String messageId, String message, Long createdOn, String exchangeName, String routing, String queueName, String type) {
         long id = nextValue();
-        String sql = "insert into mq_message(id, message,time, EXCHANGE_NAME, ROUTING_KEY, QUEUE_NAME, EXCHANGE_TYPE, APP_TYPE) values(?,?,?,?,?,?,?,?)";
-        int rows = jdbcTemplate.update(sql, id, message, time, exchangeName, routing, queueName, type, appType);
-        return rows;
+        String sql = "insert into mq_message(id, message_id, message, CREATED_ON, EXCHANGE_NAME, ROUTING_KEY, QUEUE_NAME, EXCHANGE_TYPE) values(?,?,?,?,?,?,?,?)";
+        int rows = jdbcTemplate.update(sql, id, messageId, message, createdOn, exchangeName, routing, queueName, type);
+        return id;
+    }
+
+    @Override
+    public long insert(String message, Long createdOn, String exchangeName, String routing, String queueName, String type, String appType) {
+        long id = nextValue();
+        String sql = "insert into mq_message(id, message,CREATED_ON, EXCHANGE_NAME, ROUTING_KEY, QUEUE_NAME, EXCHANGE_TYPE, APP_TYPE) values(?,?,?,?,?,?,?,?)";
+        int rows = jdbcTemplate.update(sql, id, message, createdOn, exchangeName, routing, queueName, type, appType);
+        return id;
     }
 
     @Override
