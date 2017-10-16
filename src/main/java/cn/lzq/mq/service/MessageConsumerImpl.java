@@ -1,6 +1,9 @@
 package cn.lzq.mq.service;
 
+import cn.lzq.mq.common.Action;
+import cn.lzq.mq.dao.MQRedisDao;
 import com.rabbitmq.client.Channel;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.amqp.core.*;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.ChannelAwareMessageListener;
@@ -19,6 +22,9 @@ public class MessageConsumerImpl implements MessageConsumer {
 
     @Autowired
     private ConnectionFactory connectionFactory;
+
+    @Autowired
+    protected MQRedisDao redisDao;
 
     @Override
     public void consume(String exchangeName, String routing, String queueName, MessageProcess messageProcess) {
@@ -74,17 +80,53 @@ public class MessageConsumerImpl implements MessageConsumer {
         return new ChannelAwareMessageListener() {
             @Override
             public void onMessage(Message message, Channel channel) throws Exception {
+                Action action = Action.RETRY;
                 try {
                     MessageConverter messageConverter = new Jackson2JsonMessageConverter();
                     Object messageBean = messageConverter.fromMessage(message);
-                    boolean isSuccess = messageProcess.process(messageBean.toString());
-                    if (isSuccess) {
+
+                    // 去重操作，每个队列里面的消息处理成功后，放入redis。
+                    // 每次消费消息的时候，先查询redis判断是否存在，存在则不处理，否则正常处理
+                    if (messageBean != null) {
+                        String queueName = message.getMessageProperties().getConsumerQueue();
+                        String messageId = message.getMessageProperties().getMessageId();
+                        if (StringUtils.isNotBlank(messageId) && StringUtils.isNotBlank(queueName)) {
+                            if (redisDao.existKey(queueName + "_" + messageId)) {
+                                channel.basicAck(message.getMessageProperties().getDeliveryTag(), true);
+                            } else {
+                                boolean isSuccess = messageProcess.process(messageBean.toString());
+                                if (isSuccess) {
+                                    // 成功处理消息，加入redis
+                                    redisDao.setStringEx(queueName + "_" + messageId, 60, messageId);
+                                    action = Action.ACCEPT;
+                                } else {
+                                    String key = "retry_" + queueName + "_" + messageId;
+                                    if (redisDao.existKey(key)) {
+                                        if (Integer.valueOf(redisDao.getString(key)) >= 3) {
+                                            action = Action.REJECT;
+                                        } else {
+                                            redisDao.incr(key);
+                                            action = Action.RETRY;
+                                        }
+                                    } else {
+                                        redisDao.setString(key, "0");
+                                        action = Action.RETRY;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    action = Action.REJECT;
+                } finally {
+                    // 通过finally块来保证Ack/Nack会且只会执行一次
+                    if (action == Action.ACCEPT) {
                         channel.basicAck(message.getMessageProperties().getDeliveryTag(), true);
+                    } else if (action == Action.RETRY) {
+                        channel.basicNack(message.getMessageProperties().getDeliveryTag(), false, true);
                     } else {
                         channel.basicNack(message.getMessageProperties().getDeliveryTag(), false, false);
                     }
-                } catch (Exception e) {
-                    channel.basicNack(message.getMessageProperties().getDeliveryTag(), false, false);
                 }
             }
         };
