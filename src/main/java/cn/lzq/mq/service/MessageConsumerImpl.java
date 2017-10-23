@@ -81,42 +81,48 @@ public class MessageConsumerImpl implements MessageConsumer {
             @Override
             public void onMessage(Message message, Channel channel) throws Exception {
                 Action action = Action.RETRY;
-                try {
-                    MessageConverter messageConverter = new Jackson2JsonMessageConverter();
-                    Object messageBean = messageConverter.fromMessage(message);
+                MessageConverter messageConverter = new Jackson2JsonMessageConverter();
+                Object messageBean = messageConverter.fromMessage(message);
+                String queueName = null;
+                String messageId = null;
+                if (messageBean != null) {
+                    queueName = message.getMessageProperties().getConsumerQueue();
+                    messageId = message.getMessageProperties().getMessageId();
+                }
 
+                try {
                     // 去重操作，每个队列里面的消息处理成功后，放入redis。
                     // 每次消费消息的时候，先查询redis判断是否存在，存在则不处理，否则正常处理
-                    if (messageBean != null) {
-                        String queueName = message.getMessageProperties().getConsumerQueue();
-                        String messageId = message.getMessageProperties().getMessageId();
-                        if (StringUtils.isNotBlank(messageId) && StringUtils.isNotBlank(queueName)) {
-                            if (redisDao.existKey(queueName + "_" + messageId)) {
-                                channel.basicAck(message.getMessageProperties().getDeliveryTag(), true);
+                    if (StringUtils.isNotBlank(messageId) && StringUtils.isNotBlank(queueName)) {
+                        if (redisDao.existKey(queueName + "_" + messageId)) {
+                            channel.basicAck(message.getMessageProperties().getDeliveryTag(), true);
+                        } else {
+                            // 开始处理消息，加入redis
+                            redisDao.setStringEx(queueName + "_" + messageId, 60, messageId);
+                            boolean isSuccess = messageProcess.process(messageBean.toString());
+                            if (isSuccess) {
+                                action = Action.ACCEPT;
                             } else {
-                                boolean isSuccess = messageProcess.process(messageBean.toString());
-                                if (isSuccess) {
-                                    // 成功处理消息，加入redis
-                                    redisDao.setStringEx(queueName + "_" + messageId, 60, messageId);
-                                    action = Action.ACCEPT;
-                                } else {
-                                    String key = "retry_" + queueName + "_" + messageId;
-                                    if (redisDao.existKey(key)) {
-                                        if (Integer.valueOf(redisDao.getString(key)) >= 3) {
-                                            action = Action.REJECT;
-                                        } else {
-                                            redisDao.incr(key);
-                                            action = Action.RETRY;
-                                        }
+                                // 处理失败，从redis里面删除
+                                redisDao.del(queueName + "_" + messageId);
+                                String key = "retry_" + queueName + "_" + messageId;
+                                if (redisDao.existKey(key)) {
+                                    if (Integer.valueOf(redisDao.getString(key)) >= 3) {
+                                        action = Action.REJECT;
                                     } else {
-                                        redisDao.setString(key, "0");
+                                        redisDao.incr(key);
                                         action = Action.RETRY;
                                     }
+                                } else {
+                                    redisDao.setString(key, "0");
+                                    action = Action.RETRY;
                                 }
                             }
                         }
                     }
                 } catch (Exception e) {
+                    // 处理失败，从redis里面删除
+                    redisDao.del(queueName + "_" + messageId);
                     action = Action.REJECT;
                 } finally {
                     // 通过finally块来保证Ack/Nack会且只会执行一次
